@@ -70,7 +70,7 @@ struct Render
 
     void Unload();
 
-    void Draw();
+    void Draw(const mat4 &viewMat);
 
   private:
     void AddPipeline();

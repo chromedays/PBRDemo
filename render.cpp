@@ -175,7 +175,7 @@ void Render::Unload()
     pSwapChain = NULL;
 }
 
-void Render::Draw()
+void Render::Draw(const mat4 &viewMat)
 {
     acquireNextImage(pRenderer, pSwapChain, pImageAcquiredSemaphore, NULL, &mFrameIndex);
 
@@ -191,7 +191,7 @@ void Render::Draw()
     BufferUpdateDesc viewUbUpdate = {};
     viewUbUpdate.pBuffer = pViewUb[mFrameIndex];
     ViewUniformData tempViewUniformData = {};
-    tempViewUniformData.mViewMat = mat4::identity();
+    tempViewUniformData.mViewMat = viewMat;
     tempViewUniformData.mProjMat =
         mat4::perspective(degToRad(60), (float)pApp->mSettings.mHeight / (float)pApp->mSettings.mWidth, 0.1f, 100);
     beginUpdateResource(&viewUbUpdate);
@@ -201,7 +201,7 @@ void Render::Draw()
     BufferUpdateDesc instanceUbUpdate = {};
     instanceUbUpdate.pBuffer = pInstanceUb[mFrameIndex];
     InstanceUniformData tempInstanceUniformData = {};
-    tempInstanceUniformData.mModelMat = mat4::translation({0, 0, 5});
+    tempInstanceUniformData.mModelMat = mat4::translation({2, 2, 5});
     beginUpdateResource(&instanceUbUpdate);
     memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(InstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
@@ -286,11 +286,11 @@ void Render::AddPipeline()
     // depthState.mDepthFunc = CMP_GEQUAL;
 
     RasterizerStateDesc rasterizerState = {};
-    rasterizerState.mCullMode = CULL_MODE_NONE;
+    rasterizerState.mCullMode = CULL_MODE_BACK;
     rasterizerState.mFillMode = FILL_MODE_SOLID;
     rasterizerState.mMultiSample = true;
     rasterizerState.mScissor = true;
-    rasterizerState.mFrontFace = FRONT_FACE_CCW;
+    rasterizerState.mFrontFace = FRONT_FACE_CW;
 
     PipelineDesc pipelineDesc = {};
     pipelineDesc.mType = PIPELINE_TYPE_GRAPHICS;

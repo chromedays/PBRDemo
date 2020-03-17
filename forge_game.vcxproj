@@ -60,7 +60,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)lib\$(Configuration);$(VULKAN_SDK)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ozz_base.lib;ozz_animation.lib;ozz_animation_offline.lib;LuaManager.lib;gainputstatic.lib;OS.lib;RendererVulkan.lib;SpirvTools.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;Xinput.lib;ozz_base.lib;ozz_animation.lib;ozz_animation_offline.lib;LuaManager.lib;gainputstatic.lib;OS.lib;RendererVulkan.lib;SpirvTools.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -79,11 +79,11 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)lib\$(Configuration);$(VULKAN_SDK)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ozz_base.lib;ozz_animation.lib;ozz_animation_offline.lib;LuaManager.lib;gainputstatic.lib;OS.lib;RendererVulkan.lib;SpirvTools.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;Xinput.lib;ozz_base.lib;ozz_animation.lib;ozz_animation_offline.lib;LuaManager.lib;gainputstatic.lib;OS.lib;RendererVulkan.lib;SpirvTools.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="app.cpp" />
     <ClCompile Include="render.cpp" />
   </ItemGroup>
   <ItemGroup>
