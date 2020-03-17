@@ -40,7 +40,6 @@ void Render::Init()
     shaderDesc.mStages[0].mRoot = RD_SHADER_SOURCES;
     shaderDesc.mStages[1].pFileName = "test.frag";
     shaderDesc.mStages[1].mRoot = RD_SHADER_SOURCES;
-    shaderDesc.mTarget = rendererDesc.mShaderTarget;
 
     addShader(pRenderer, &shaderDesc, &pChessPieceShader);
     // addSampler()
@@ -77,10 +76,6 @@ void Render::Init()
     }
     // viewUbLoad.ppBuffer = &pViewUb;
 
-    waitForAllResourceLoads();
-
-    conf_free(pCubePoints);
-
     RootSignatureDesc rootSignatureDesc = {};
     rootSignatureDesc.ppShaders = &pChessPieceShader;
     rootSignatureDesc.mShaderCount = 1;
@@ -93,25 +88,41 @@ void Render::Init()
 
     DescriptorSetDesc descriptorSetDesc = {};
     descriptorSetDesc.pRootSignature = pRootSignature;
+
     descriptorSetDesc.mUpdateFrequency = DESCRIPTOR_UPDATE_FREQ_PER_FRAME;
     descriptorSetDesc.mMaxSets = gSwapChainImageCount;
-    addDescriptorSet(pRenderer, &descriptorSetDesc, &pDescriptorSet);
+    addDescriptorSet(pRenderer, &descriptorSetDesc, &pDescriptorSetView);
+
+    descriptorSetDesc.mUpdateFrequency = DESCRIPTOR_UPDATE_FREQ_PER_DRAW;
+    descriptorSetDesc.mMaxSets = gSwapChainImageCount;
+    addDescriptorSet(pRenderer, &descriptorSetDesc, &pDescriptorSetInstance);
 
     for (uint32_t i = 0; i < gSwapChainImageCount; i++)
     {
-        DescriptorData descriptorUpdate[2] = {};
+        DescriptorData descriptorUpdate[1] = {};
         descriptorUpdate[0].pName = "view";
         descriptorUpdate[0].ppBuffers = &pViewUb[i];
-        descriptorUpdate[1].pName = "instance";
-        descriptorUpdate[1].ppBuffers = &pInstanceUb[i];
-        updateDescriptorSet(pRenderer, i, pDescriptorSet, (uint32_t)std::size(descriptorUpdate), descriptorUpdate);
+        updateDescriptorSet(pRenderer, i, pDescriptorSetView, 1, descriptorUpdate);
+
+        descriptorUpdate[0].pName = "instance";
+        descriptorUpdate[0].ppBuffers = &pInstanceUb[i];
+        updateDescriptorSet(pRenderer, i, pDescriptorSetInstance, 1, descriptorUpdate);
     }
+
+    mLightSourcePipeline.Init(pRenderer);
+
+    waitForAllResourceLoads();
+    conf_free(pCubePoints);
 }
 
 void Render::Exit()
 {
     waitQueueIdle(pGraphicsQueue);
-    removeDescriptorSet(pRenderer, pDescriptorSet);
+
+    mLightSourcePipeline.Exit();
+
+    removeDescriptorSet(pRenderer, pDescriptorSetInstance);
+    removeDescriptorSet(pRenderer, pDescriptorSetView);
     removeRootSignature(pRenderer, pRootSignature);
     for (size_t i = 0; i < std::size(pInstanceUb); i++)
         removeResource(pInstanceUb[i]);
@@ -162,11 +173,16 @@ void Render::Load()
     addRenderTarget(pRenderer, &depthRTDesc, &pDepthBuffer);
 
     AddPipeline();
+
+    mLightSourcePipeline.Load(pSwapChain, pDepthBuffer);
 }
 
 void Render::Unload()
 {
     waitQueueIdle(pGraphicsQueue);
+
+    mLightSourcePipeline.Unload();
+
     removePipeline(pRenderer, pPipeline);
     pPipeline = NULL;
     removeRenderTarget(pRenderer, pDepthBuffer);
@@ -188,12 +204,15 @@ void Render::Draw(const mat4 &viewMat)
     if (fenceStatus == FENCE_STATUS_INCOMPLETE)
         waitForFences(pRenderer, 1, &pRenderCompleteFence);
 
+    mat4 projMat =
+        mat4::perspective(degToRad(60), (float)pApp->mSettings.mHeight / (float)pApp->mSettings.mWidth, 0.1f, 100);
+
     BufferUpdateDesc viewUbUpdate = {};
     viewUbUpdate.pBuffer = pViewUb[mFrameIndex];
     ViewUniformData tempViewUniformData = {};
     tempViewUniformData.mViewMat = viewMat;
-    tempViewUniformData.mProjMat =
-        mat4::perspective(degToRad(60), (float)pApp->mSettings.mHeight / (float)pApp->mSettings.mWidth, 0.1f, 100);
+    tempViewUniformData.mProjMat = projMat;
+
     beginUpdateResource(&viewUbUpdate);
     memcpy(viewUbUpdate.pMappedData, &tempViewUniformData, sizeof(ViewUniformData));
     endUpdateResource(&viewUbUpdate, NULL);
@@ -206,47 +225,52 @@ void Render::Draw(const mat4 &viewMat)
     memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(InstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
 
-    Cmd *cmd = ppCmds[mFrameIndex];
-    beginCmd(cmd);
+    mLightSourcePipeline.UpdateUb(projMat * viewMat, mFrameIndex);
+
+    Cmd *pCmd = ppCmds[mFrameIndex];
+    beginCmd(pCmd);
 
     RenderTargetBarrier barriers[2] = {};
     barriers[0].pRenderTarget = pRenderTarget;
     barriers[0].mNewState = RESOURCE_STATE_RENDER_TARGET;
     barriers[1].pRenderTarget = pDepthBuffer;
     barriers[1].mNewState = RESOURCE_STATE_DEPTH_WRITE;
-    cmdResourceBarrier(cmd, 0, NULL, 0, NULL, 2, barriers);
+    cmdResourceBarrier(pCmd, 0, NULL, 0, NULL, 2, barriers);
 
     LoadActionsDesc loadActions = {};
     loadActions.mLoadActionsColor[0] = LOAD_ACTION_CLEAR;
-    loadActions.mClearColorValues[0].r = 1.0f;
-    loadActions.mClearColorValues[0].g = 1.0f;
-    loadActions.mClearColorValues[0].b = 0.0f;
-    loadActions.mClearColorValues[0].a = 0.0f;
+    loadActions.mClearColorValues[0].r = 0.3f;
+    loadActions.mClearColorValues[0].g = 0.3f;
+    loadActions.mClearColorValues[0].b = 0.3f;
+    loadActions.mClearColorValues[0].a = 1.0f;
     loadActions.mLoadActionDepth = LOAD_ACTION_CLEAR;
     loadActions.mClearDepth.depth = 1.0f;
     loadActions.mClearDepth.stencil = 0;
-    cmdBindRenderTargets(cmd, 1, &pRenderTarget, pDepthBuffer, &loadActions, NULL, NULL, (uint32_t)(-1),
+    cmdBindRenderTargets(pCmd, 1, &pRenderTarget, pDepthBuffer, &loadActions, NULL, NULL, (uint32_t)(-1),
                          (uint32_t)(-1));
-    cmdSetViewport(cmd, 0, 0, (float)pRenderTarget->mWidth, (float)pRenderTarget->mHeight, 0, 1);
-    cmdSetScissor(cmd, 0, 0, pRenderTarget->mWidth, pRenderTarget->mHeight);
+    cmdSetViewport(pCmd, 0, 0, (float)pRenderTarget->mWidth, (float)pRenderTarget->mHeight, 0, 1);
+    cmdSetScissor(pCmd, 0, 0, pRenderTarget->mWidth, pRenderTarget->mHeight);
 
-    cmdBindPipeline(cmd, pPipeline);
+    cmdBindPipeline(pCmd, pPipeline);
     uint32_t stride = 6 * sizeof(float);
     uint64_t offset = 0;
-    cmdBindVertexBuffer(cmd, 1, &pCubeVb, &stride, &offset);
-    cmdBindDescriptorSet(cmd, 0, pDescriptorSet);
-    cmdDraw(cmd, 36, 0);
+    cmdBindVertexBuffer(pCmd, 1, &pCubeVb, &stride, &offset);
+    cmdBindDescriptorSet(pCmd, 0, pDescriptorSetView);
+    cmdBindDescriptorSet(pCmd, 1, pDescriptorSetInstance);
+    cmdDraw(pCmd, 36, 0);
 
-    cmdBindRenderTargets(cmd, 0, NULL, NULL, NULL, NULL, NULL, (uint32_t)(-1), (uint32_t)(-1));
+    mLightSourcePipeline.BuildCmd(pCmd);
+
+    cmdBindRenderTargets(pCmd, 0, NULL, NULL, NULL, NULL, NULL, (uint32_t)(-1), (uint32_t)(-1));
     barriers[0].pRenderTarget = pRenderTarget;
     barriers[0].mNewState = RESOURCE_STATE_PRESENT;
-    cmdResourceBarrier(cmd, 0, NULL, 0, NULL, 1, barriers);
+    cmdResourceBarrier(pCmd, 0, NULL, 0, NULL, 1, barriers);
 
-    endCmd(cmd);
+    endCmd(pCmd);
 
     QueueSubmitDesc submitDesc = {};
     submitDesc.mCmdCount = 1;
-    submitDesc.ppCmds = &cmd;
+    submitDesc.ppCmds = &pCmd;
     submitDesc.pSignalFence = pRenderCompleteFence;
     submitDesc.mWaitSemaphoreCount = 1;
     submitDesc.ppWaitSemaphores = &pImageAcquiredSemaphore;
@@ -307,4 +331,177 @@ void Render::AddPipeline()
     pipelineDesc.mGraphicsDesc.mPrimitiveTopo = PRIMITIVE_TOPO_TRI_LIST;
 
     addPipeline(pRenderer, &pipelineDesc, &pPipeline);
+}
+
+void LightSourcePipeline::Init(Renderer *pRenderer)
+{
+    this->pRenderer = pRenderer;
+
+    ShaderLoadDesc shaderDesc = {};
+    shaderDesc.mStages[0].pFileName = "light_source.vert";
+    shaderDesc.mStages[0].mRoot = RD_SHADER_SOURCES;
+    shaderDesc.mStages[1].pFileName = "light_source.frag";
+    shaderDesc.mStages[1].mRoot = RD_SHADER_SOURCES;
+    addShader(pRenderer, &shaderDesc, &pShader);
+
+    RootSignatureDesc rootSignatureDesc = {};
+    rootSignatureDesc.ppShaders = &pShader;
+    rootSignatureDesc.mShaderCount = 1;
+    addRootSignature(pRenderer, &rootSignatureDesc, &pRootSignature);
+
+    DescriptorSetDesc descriptorSetDesc = {};
+    descriptorSetDesc.pRootSignature = pRootSignature;
+
+    descriptorSetDesc.mUpdateFrequency = DESCRIPTOR_UPDATE_FREQ_PER_FRAME;
+    descriptorSetDesc.mMaxSets = gSwapChainImageCount;
+    addDescriptorSet(pRenderer, &descriptorSetDesc, &pDescriptorSetView);
+
+    descriptorSetDesc.mUpdateFrequency = DESCRIPTOR_UPDATE_FREQ_PER_DRAW;
+    descriptorSetDesc.mMaxSets = gSwapChainImageCount;
+    addDescriptorSet(pRenderer, &descriptorSetDesc, &pDescriptorSetInstance);
+
+    float *points;
+    int points_count;
+    generateSpherePoints(&points, &points_count, 32);
+
+    BufferLoadDesc vbLoad = {};
+    vbLoad.ppBuffer = &pLightSourceVb;
+    vbLoad.pData = points;
+    vbLoad.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
+    vbLoad.mDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
+    vbLoad.mDesc.mSize = points_count * sizeof(float);
+    addResource(&vbLoad, NULL, LOAD_PRIORITY_NORMAL);
+    mLightSourceVerticesCount = points_count / 6;
+
+    BufferLoadDesc ubLoad = {};
+    ubLoad.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    ubLoad.mDesc.mDescriptors = DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubLoad.mDesc.mSize = sizeof(ViewUniformData);
+    for (uint32_t i = 0; i < std::size(pViewUb); i++)
+    {
+        ubLoad.ppBuffer = &pViewUb[i];
+        addResource(&ubLoad, NULL, LOAD_PRIORITY_NORMAL);
+    }
+
+    ubLoad.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    ubLoad.mDesc.mDescriptors = DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubLoad.mDesc.mSize = sizeof(InstanceUniformData);
+    for (uint32_t i = 0; i < std::size(pInstanceUb); i++)
+    {
+        ubLoad.ppBuffer = &pInstanceUb[i];
+        addResource(&ubLoad, NULL, LOAD_PRIORITY_NORMAL);
+    }
+
+    for (uint32_t i = 0; i < gSwapChainImageCount; i++)
+    {
+        DescriptorData descriptorUpdate[1] = {};
+        descriptorUpdate[0].pName = "view";
+        descriptorUpdate[0].ppBuffers = &pViewUb[i];
+        updateDescriptorSet(pRenderer, i, pDescriptorSetView, 1, descriptorUpdate);
+
+        descriptorUpdate[0].pName = "instance";
+        descriptorUpdate[0].ppBuffers = &pInstanceUb[i];
+        updateDescriptorSet(pRenderer, i, pDescriptorSetInstance, 1, descriptorUpdate);
+    }
+
+    conf_free(points);
+}
+
+void LightSourcePipeline::Exit()
+{
+    for (uint32_t i = 0; i < std::size(pInstanceUb); i++)
+        removeResource(pInstanceUb[i]);
+    for (uint32_t i = 0; i < std::size(pViewUb); i++)
+        removeResource(pViewUb[i]);
+    removeResource(pLightSourceVb);
+    removeDescriptorSet(pRenderer, pDescriptorSetInstance);
+    removeDescriptorSet(pRenderer, pDescriptorSetView);
+    removeRootSignature(pRenderer, pRootSignature);
+    removeShader(pRenderer, pShader);
+}
+
+void LightSourcePipeline::Load(SwapChain *pSwapChain, RenderTarget *pDepthBuffer)
+{
+    VertexLayout vertexLayout = {};
+    vertexLayout.mAttribCount = 1;
+    vertexLayout.mAttribs[0].mSemantic = SEMANTIC_POSITION;
+    vertexLayout.mAttribs[0].mFormat = TinyImageFormat_R32G32B32_SFLOAT;
+    vertexLayout.mAttribs[0].mBinding = 0;
+    vertexLayout.mAttribs[0].mLocation = 0;
+    vertexLayout.mAttribs[0].mOffset = 0;
+    vertexLayout.mAttribs[0].mRate = VERTEX_ATTRIB_RATE_VERTEX;
+#if VULKAN
+    vertexLayout.mAttribCount = 2;
+    vertexLayout.mAttribs[1].mSemantic = SEMANTIC_NORMAL;
+    vertexLayout.mAttribs[1].mFormat = TinyImageFormat_R32G32B32_SFLOAT;
+    vertexLayout.mAttribs[1].mBinding = 0;
+    vertexLayout.mAttribs[1].mLocation = 0;
+    vertexLayout.mAttribs[1].mOffset = 3 * sizeof(float);
+    vertexLayout.mAttribs[1].mRate = VERTEX_ATTRIB_RATE_VERTEX;
+#endif
+
+    DepthStateDesc depthState = {};
+    depthState.mDepthTest = true;
+    depthState.mDepthWrite = true;
+    depthState.mDepthFunc = CMP_LEQUAL;
+    // depthState.mDepthFunc = CMP_GEQUAL;
+
+    RasterizerStateDesc rasterizerState = {};
+    rasterizerState.mCullMode = CULL_MODE_BACK;
+    rasterizerState.mFillMode = FILL_MODE_SOLID;
+    rasterizerState.mMultiSample = true;
+    rasterizerState.mScissor = true;
+    rasterizerState.mFrontFace = FRONT_FACE_CW;
+
+    PipelineDesc pipelineDesc = {};
+    pipelineDesc.mType = PIPELINE_TYPE_GRAPHICS;
+    pipelineDesc.mGraphicsDesc.pShaderProgram = pShader;
+    pipelineDesc.mGraphicsDesc.pRootSignature = pRootSignature;
+    pipelineDesc.mGraphicsDesc.pVertexLayout = &vertexLayout;
+    pipelineDesc.mGraphicsDesc.pDepthState = &depthState;
+    pipelineDesc.mGraphicsDesc.pRasterizerState = &rasterizerState;
+    pipelineDesc.mGraphicsDesc.pColorFormats = &pSwapChain->ppRenderTargets[0]->mFormat;
+    pipelineDesc.mGraphicsDesc.mRenderTargetCount = 1;
+    pipelineDesc.mGraphicsDesc.mSampleCount = pSwapChain->ppRenderTargets[0]->mSampleCount;
+    pipelineDesc.mGraphicsDesc.mSampleQuality = pSwapChain->ppRenderTargets[0]->mSampleQuality;
+    pipelineDesc.mGraphicsDesc.mDepthStencilFormat = pDepthBuffer->mFormat;
+    pipelineDesc.mGraphicsDesc.mPrimitiveTopo = PRIMITIVE_TOPO_TRI_LIST;
+
+    addPipeline(pRenderer, &pipelineDesc, &pPipeline);
+}
+
+void LightSourcePipeline::Unload()
+{
+    removePipeline(pRenderer, pPipeline);
+}
+
+void LightSourcePipeline::UpdateUb(const mat4 &projViewMat, int frameIndex)
+{
+    BufferUpdateDesc viewUbUpdate = {};
+    viewUbUpdate.pBuffer = pViewUb[frameIndex];
+    beginUpdateResource(&viewUbUpdate);
+    ViewUniformData viewUniformData = {};
+    viewUniformData.mViewProjMat = projViewMat;
+    memcpy(viewUbUpdate.pMappedData, &viewUniformData, sizeof(ViewUniformData));
+    endUpdateResource(&viewUbUpdate, NULL);
+
+    BufferUpdateDesc instanceUbUpdate = {};
+    instanceUbUpdate.pBuffer = pInstanceUb[frameIndex];
+    beginUpdateResource(&instanceUbUpdate);
+    InstanceUniformData instanceUniformData = {};
+    instanceUniformData.mModelMat = mat4::identity();
+    instanceUniformData.mColor = {0.5f, 0, 0.5f};
+    memcpy(instanceUbUpdate.pMappedData, &instanceUniformData, sizeof(InstanceUniformData));
+    endUpdateResource(&instanceUbUpdate, NULL);
+}
+
+void LightSourcePipeline::BuildCmd(Cmd *pCmd)
+{
+    cmdBindPipeline(pCmd, pPipeline);
+    uint32_t stride = 6 * sizeof(float);
+    uint64_t offset = 0;
+    cmdBindVertexBuffer(pCmd, 1, &pLightSourceVb, &stride, &offset);
+    cmdBindDescriptorSet(pCmd, 0, pDescriptorSetView);
+    cmdBindDescriptorSet(pCmd, 1, pDescriptorSetInstance);
+    cmdDraw(pCmd, mLightSourceVerticesCount, 0);
 }

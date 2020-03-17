@@ -8,7 +8,7 @@ layout (binding = 0, std140, UPDATE_FREQ_PER_FRAME) uniform ViewUbo {
     mat4 mProjMat;
 } view;
 
-layout (binding = 1, std140, UPDATE_FREQ_PER_FRAME) uniform InstanceUbo {
+layout (binding = 1, std140, UPDATE_FREQ_PER_DRAW) uniform InstanceUbo {
     mat4 mModelMat;
     float mAlbedo;
     float mMetallic;
@@ -26,6 +26,6 @@ void main()
 {
 	mat4 viewModelMat = view.mViewMat * instance.mModelMat;
     mat3 normalMat = mat3(transpose(inverse(viewModelMat)));
-    outColor = ((normalMat * inNormal) + vec3(1)) * 0.5;
+    outColor = ((inNormal) + vec3(1)) * 0.5;
 	gl_Position = view.mProjMat * viewModelMat * vec4(inPos.xyz, 1);
 }

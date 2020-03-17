@@ -9,8 +9,8 @@ const uint32_t gSwapChainImageCount = 3;
 
 struct Vertex
 {
-    vec3 mPos;
-    vec3 mNormal;
+    float mPos[3];
+    float mNormal[3];
 };
 
 struct InstanceUniformData
@@ -26,6 +26,42 @@ struct ViewUniformData
 {
     mat4 mViewMat;
     mat4 mProjMat;
+};
+
+struct LightSourcePipeline
+{
+    struct ViewUniformData
+    {
+        mat4 mViewProjMat;
+    };
+
+    struct InstanceUniformData
+    {
+        mat4 mModelMat;
+        vec3 mColor;
+    };
+
+    Renderer *pRenderer;
+
+    Shader *pShader;
+    RootSignature *pRootSignature;
+    DescriptorSet *pDescriptorSetView;
+    DescriptorSet *pDescriptorSetInstance;
+    Buffer *pLightSourceVb;
+    int mLightSourceVerticesCount;
+    Buffer *pViewUb[gSwapChainImageCount];
+    Buffer *pInstanceUb[gSwapChainImageCount];
+
+    Pipeline *pPipeline;
+
+    void Init(Renderer *pRenderer);
+
+    void Exit();
+    void Load(SwapChain *pSwapChain, RenderTarget *pDepthBuffer);
+    void Unload();
+
+    void UpdateUb(const mat4 &projViewMat, int frameIndex);
+    void BuildCmd(Cmd *pCmd);
 };
 
 struct Render
@@ -45,12 +81,15 @@ struct Render
     Shader *pChessPieceShader;
 
     RootSignature *pRootSignature;
-    DescriptorSet *pDescriptorSet;
+    DescriptorSet *pDescriptorSetView;
+    DescriptorSet *pDescriptorSetInstance;
 
     Buffer *pCubeVb;
 
     Buffer *pInstanceUb[gSwapChainImageCount];
     Buffer *pViewUb[gSwapChainImageCount];
+
+    LightSourcePipeline mLightSourcePipeline;
 
     SwapChain *pSwapChain;
     RenderTarget *pDepthBuffer;

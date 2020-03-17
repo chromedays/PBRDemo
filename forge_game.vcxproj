@@ -88,6 +88,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
+    <None Include="Shaders\Vulkan\light_source.frag" />
+    <None Include="Shaders\Vulkan\light_source.vert" />
     <None Include="Shaders\Vulkan\test.frag" />
     <None Include="Shaders\Vulkan\test.vert" />
   </ItemGroup>
