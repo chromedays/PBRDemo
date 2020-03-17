@@ -16,19 +16,23 @@ struct Vertex
 struct MainInstanceUniformData
 {
     mat4 mModelMat;
-    float mAlbedo;
+    vec3 mAlbedo;
     float mMetallic;
     float mRoughness;
     float mAO;
 };
 
+#define MAX_LIGHTS_COUNT 20
+
 struct MainViewUniformData
 {
     mat4 mViewMat;
     mat4 mProjMat;
+    vec3 mCamPos;
+    vec3 mLightPositions[MAX_LIGHTS_COUNT];
+    vec3 mLightColors[MAX_LIGHTS_COUNT];
+    int mLightsCount;
 };
-
-#define MAX_LIGHTS_COUNT 20
 
 struct LightSourcePipeline
 {
@@ -105,7 +109,8 @@ struct Render
     void Exit();
     void Load();
     void Unload();
-    void Draw(const mat4 &viewMat, const eastl::vector<vec3> &lightPositions, const eastl::vector<vec3> &lightColors);
+    void Draw(const mat4 &viewMat, const vec3 &camPos, const eastl::vector<vec3> &lightPositions,
+              const eastl::vector<vec3> &lightColors);
 
   private:
     void AddPipeline();

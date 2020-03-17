@@ -193,7 +193,7 @@ void Render::Unload()
     pSwapChain = NULL;
 }
 
-void Render::Draw(const mat4 &viewMat, const eastl::vector<vec3> &lightPositions,
+void Render::Draw(const mat4 &viewMat, const vec3 &camPos, const eastl::vector<vec3> &lightPositions,
                   const eastl::vector<vec3> &lightColors)
 {
     acquireNextImage(pRenderer, pSwapChain, pImageAcquiredSemaphore, NULL, &mFrameIndex);
@@ -215,6 +215,13 @@ void Render::Draw(const mat4 &viewMat, const eastl::vector<vec3> &lightPositions
     MainViewUniformData tempViewUniformData = {};
     tempViewUniformData.mViewMat = viewMat;
     tempViewUniformData.mProjMat = projMat;
+    tempViewUniformData.mCamPos = camPos;
+    for (eastl_size_t i = 0; i < lightPositions.size(); i++)
+    {
+        tempViewUniformData.mLightPositions[i] = lightPositions[i];
+        tempViewUniformData.mLightColors[i] = lightColors[i];
+    }
+    tempViewUniformData.mLightsCount = (int)lightPositions.size();
 
     beginUpdateResource(&viewUbUpdate);
     memcpy(viewUbUpdate.pMappedData, &tempViewUniformData, sizeof(MainViewUniformData));
@@ -223,7 +230,11 @@ void Render::Draw(const mat4 &viewMat, const eastl::vector<vec3> &lightPositions
     BufferUpdateDesc instanceUbUpdate = {};
     instanceUbUpdate.pBuffer = pInstanceUb[mFrameIndex];
     MainInstanceUniformData tempInstanceUniformData = {};
-    tempInstanceUniformData.mModelMat = mat4::translation({2, 2, 5});
+    tempInstanceUniformData.mModelMat = mat4::scale({10, 1, 10});
+    tempInstanceUniformData.mAlbedo = {1, 1, 0.8f};
+    tempInstanceUniformData.mMetallic = 0.5f;
+    tempInstanceUniformData.mRoughness = 0.5f;
+    tempInstanceUniformData.mAO = 1;
     beginUpdateResource(&instanceUbUpdate);
     memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(MainInstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
@@ -365,7 +376,7 @@ void LightSourcePipeline::Init(Renderer *pRenderer)
 
     float *points;
     int points_count;
-    generateSpherePoints(&points, &points_count, 32);
+    generateSpherePoints(&points, &points_count, 32, 0.2f);
 
     BufferLoadDesc vbLoad = {};
     vbLoad.ppBuffer = &pLightSourceVb;

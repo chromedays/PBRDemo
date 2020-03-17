@@ -59,7 +59,7 @@ class App : public IApp
         addInputAction(&inputAction);
 
         mLightPositions = {
-            {-8, -8, -8}, {-8, -8, 8}, {8, -8, -8}, {8, -8, 8}, {-8, 8, -8}, {-8, 8, 8}, {8, 8, -8}, {8, 8, 8},
+            {-2, -2, -2}, {-2, -2, 2}, {2, -2, -2}, {2, -2, 2}, {-2, 2, -2}, {-2, 2, 2}, {2, 2, -2}, {2, 2, 2},
         };
 
         mLightColors = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
@@ -100,7 +100,7 @@ class App : public IApp
 
     void Draw() override
     {
-        mRender.Draw(pCamera->getViewMatrix(), mLightPositions, mLightColors);
+        mRender.Draw(pCamera->getViewMatrix(), pCamera->getViewPosition(), mLightPositions, mLightColors);
     }
 
     const char *GetName() override
