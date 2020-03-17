@@ -67,7 +67,7 @@ struct LightSourcePipeline
     void Load(SwapChain *pSwapChain, RenderTarget *pDepthBuffer);
     void Unload();
 
-    void UpdateUb(int frameIndex, const mat4 &projViewMat, const eastl::vector<vec3> &lightPositions,
+    void UpdateUb(int frameIndex, const mat4 &projViewMat, int lightsCount, const eastl::vector<vec3> &lightPositions,
                   const eastl::vector<vec3> &lightColors);
     void BuildCmd(Cmd *pCmd);
 };
@@ -109,7 +109,7 @@ struct Render
     void Exit();
     void Load();
     void Unload();
-    void Draw(const mat4 &viewMat, const vec3 &camPos, const eastl::vector<vec3> &lightPositions,
+    void Draw(const mat4 &viewMat, const vec3 &camPos, int lightsCount, const eastl::vector<vec3> &lightPositions,
               const eastl::vector<vec3> &lightColors);
 
   private:

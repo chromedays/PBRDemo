@@ -193,7 +193,7 @@ void Render::Unload()
     pSwapChain = NULL;
 }
 
-void Render::Draw(const mat4 &viewMat, const vec3 &camPos, const eastl::vector<vec3> &lightPositions,
+void Render::Draw(const mat4 &viewMat, const vec3 &camPos, int lightsCount, const eastl::vector<vec3> &lightPositions,
                   const eastl::vector<vec3> &lightColors)
 {
     acquireNextImage(pRenderer, pSwapChain, pImageAcquiredSemaphore, NULL, &mFrameIndex);
@@ -216,12 +216,12 @@ void Render::Draw(const mat4 &viewMat, const vec3 &camPos, const eastl::vector<v
     tempViewUniformData.mViewMat = viewMat;
     tempViewUniformData.mProjMat = projMat;
     tempViewUniformData.mCamPos = camPos;
-    for (eastl_size_t i = 0; i < lightPositions.size(); i++)
+    for (eastl_size_t i = 0; i < lightsCount; i++)
     {
         tempViewUniformData.mLightPositions[i] = lightPositions[i];
         tempViewUniformData.mLightColors[i] = lightColors[i];
     }
-    tempViewUniformData.mLightsCount = (int)lightPositions.size();
+    tempViewUniformData.mLightsCount = lightsCount;
 
     beginUpdateResource(&viewUbUpdate);
     memcpy(viewUbUpdate.pMappedData, &tempViewUniformData, sizeof(MainViewUniformData));
@@ -232,14 +232,15 @@ void Render::Draw(const mat4 &viewMat, const vec3 &camPos, const eastl::vector<v
     MainInstanceUniformData tempInstanceUniformData = {};
     tempInstanceUniformData.mModelMat = mat4::scale({10, 1, 10});
     tempInstanceUniformData.mAlbedo = {1, 1, 0.8f};
-    tempInstanceUniformData.mMetallic = 0.5f;
-    tempInstanceUniformData.mRoughness = 0.5f;
+    tempInstanceUniformData.mMetallic = 0.1f;
+    // printf("%f\n", tempInstanceUniformData.mMetallic);
+    tempInstanceUniformData.mRoughness = 0.0f;
     tempInstanceUniformData.mAO = 1;
     beginUpdateResource(&instanceUbUpdate);
     memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(MainInstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
 
-    mLightSourcePipeline.UpdateUb(mFrameIndex, projMat * viewMat, lightPositions, lightColors);
+    mLightSourcePipeline.UpdateUb(mFrameIndex, projMat * viewMat, lightsCount, lightPositions, lightColors);
 
     Cmd *pCmd = ppCmds[mFrameIndex];
     beginCmd(pCmd);
@@ -489,10 +490,12 @@ void LightSourcePipeline::Unload()
     removePipeline(pRenderer, pPipeline);
 }
 
-void LightSourcePipeline::UpdateUb(int frameIndex, const mat4 &projViewMat, const eastl::vector<vec3> &lightPositions,
-                                   const eastl::vector<vec3> &lightColors)
+void LightSourcePipeline::UpdateUb(int frameIndex, const mat4 &projViewMat, int lightsCount,
+                                   const eastl::vector<vec3> &lightPositions, const eastl::vector<vec3> &lightColors)
 {
-    ASSERT(lightPositions.size() <= MAX_LIGHTS_COUNT && lightPositions.size() == lightColors.size());
+    // ASSERT(lightPositions.size() <= MAX_LIGHTS_COUNT && lightPositions.size() == lightColors.size());
+
+    mInstancesCount = (uint32_t)lightsCount;
 
     BufferUpdateDesc viewUbUpdate = {};
     viewUbUpdate.pBuffer = pViewUb[frameIndex];
@@ -513,8 +516,6 @@ void LightSourcePipeline::UpdateUb(int frameIndex, const mat4 &projViewMat, cons
     }
     memcpy(instanceUbUpdate.pMappedData, &instanceUniformData, sizeof(InstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
-
-    mInstancesCount = (uint32_t)lightPositions.size();
 }
 
 void LightSourcePipeline::BuildCmd(Cmd *pCmd)

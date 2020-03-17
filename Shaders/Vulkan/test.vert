@@ -31,7 +31,7 @@ out gl_PerVertex {
 void main()
 {
 	mat4 viewModelMat = view.mViewMat * instance.mModelMat;
-    mat3 normalMat = mat3(transpose(inverse(viewModelMat)));
+    mat3 normalMat = mat3(transpose(inverse(instance.mModelMat)));
     outWorldPos = (instance.mModelMat * vec4(inPos.xyz, 1)).xyz;
     outNormal = normalMat * inNormal;
     //outColor = ((inNormal) + vec3(1)) * 0.5;

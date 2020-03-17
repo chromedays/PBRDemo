@@ -58,8 +58,10 @@ class App : public IApp
         };
         addInputAction(&inputAction);
 
+        float height = 4;
         mLightPositions = {
-            {-2, -2, -2}, {-2, -2, 2}, {2, -2, -2}, {2, -2, 2}, {-2, 2, -2}, {-2, 2, 2}, {2, 2, -2}, {2, 2, 2},
+            {-2, -height, -2}, {-2, -height, 2}, {2, -height, -2}, {2, -height, 2},
+            {-2, height, -2},  {-2, height, 2},  {2, height, -2},  {2, height, 2},
         };
 
         mLightColors = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
@@ -100,7 +102,7 @@ class App : public IApp
 
     void Draw() override
     {
-        mRender.Draw(pCamera->getViewMatrix(), pCamera->getViewPosition(), mLightPositions, mLightColors);
+        mRender.Draw(pCamera->getViewMatrix(), pCamera->getViewPosition(), 8, mLightPositions, mLightColors);
     }
 
     const char *GetName() override
