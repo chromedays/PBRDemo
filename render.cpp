@@ -201,7 +201,7 @@ void Render::Draw()
     BufferUpdateDesc instanceUbUpdate = {};
     instanceUbUpdate.pBuffer = pInstanceUb[mFrameIndex];
     InstanceUniformData tempInstanceUniformData = {};
-    tempInstanceUniformData.mModelMat = mat4::translation({0, 0, -3});
+    tempInstanceUniformData.mModelMat = mat4::translation({0, 0, 5});
     beginUpdateResource(&instanceUbUpdate);
     memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(InstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
@@ -223,12 +223,19 @@ void Render::Draw()
     loadActions.mClearColorValues[0].b = 0.0f;
     loadActions.mClearColorValues[0].a = 0.0f;
     loadActions.mLoadActionDepth = LOAD_ACTION_CLEAR;
-    loadActions.mClearDepth.depth = 0.0f;
+    loadActions.mClearDepth.depth = 1.0f;
     loadActions.mClearDepth.stencil = 0;
     cmdBindRenderTargets(cmd, 1, &pRenderTarget, pDepthBuffer, &loadActions, NULL, NULL, (uint32_t)(-1),
                          (uint32_t)(-1));
     cmdSetViewport(cmd, 0, 0, (float)pRenderTarget->mWidth, (float)pRenderTarget->mHeight, 0, 1);
     cmdSetScissor(cmd, 0, 0, pRenderTarget->mWidth, pRenderTarget->mHeight);
+
+    cmdBindPipeline(cmd, pPipeline);
+    uint32_t stride = 6 * sizeof(float);
+    uint64_t offset = 0;
+    cmdBindVertexBuffer(cmd, 1, &pCubeVb, &stride, &offset);
+    cmdBindDescriptorSet(cmd, 0, pDescriptorSet);
+    cmdDraw(cmd, 36, 0);
 
     cmdBindRenderTargets(cmd, 0, NULL, NULL, NULL, NULL, NULL, (uint32_t)(-1), (uint32_t)(-1));
     barriers[0].pRenderTarget = pRenderTarget;
@@ -276,6 +283,7 @@ void Render::AddPipeline()
     depthState.mDepthTest = true;
     depthState.mDepthWrite = true;
     depthState.mDepthFunc = CMP_LEQUAL;
+    // depthState.mDepthFunc = CMP_GEQUAL;
 
     RasterizerStateDesc rasterizerState = {};
     rasterizerState.mCullMode = CULL_MODE_NONE;
