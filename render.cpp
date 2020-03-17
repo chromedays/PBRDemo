@@ -1,8 +1,10 @@
 #include "render.h"
 #include <iterator>
 
-void Render::Init()
+void Render::Init(IApp *pApp)
 {
+    this->pApp = pApp;
+
     RendererDesc rendererDesc = {};
     rendererDesc.mApi = RENDERER_API_VULKAN;
     initRenderer(pApp->GetName(), &rendererDesc, &pRenderer);
@@ -191,7 +193,8 @@ void Render::Unload()
     pSwapChain = NULL;
 }
 
-void Render::Draw(const mat4 &viewMat)
+void Render::Draw(const mat4 &viewMat, const eastl::vector<vec3> &lightPositions,
+                  const eastl::vector<vec3> &lightColors)
 {
     acquireNextImage(pRenderer, pSwapChain, pImageAcquiredSemaphore, NULL, &mFrameIndex);
 
@@ -225,7 +228,7 @@ void Render::Draw(const mat4 &viewMat)
     memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(MainInstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
 
-    mLightSourcePipeline.UpdateUb(projMat * viewMat, mFrameIndex);
+    mLightSourcePipeline.UpdateUb(mFrameIndex, projMat * viewMat, lightPositions, lightColors);
 
     Cmd *pCmd = ppCmds[mFrameIndex];
     beginCmd(pCmd);
@@ -435,7 +438,7 @@ void LightSourcePipeline::Load(SwapChain *pSwapChain, RenderTarget *pDepthBuffer
     vertexLayout.mAttribs[1].mSemantic = SEMANTIC_NORMAL;
     vertexLayout.mAttribs[1].mFormat = TinyImageFormat_R32G32B32_SFLOAT;
     vertexLayout.mAttribs[1].mBinding = 0;
-    vertexLayout.mAttribs[1].mLocation = 0;
+    vertexLayout.mAttribs[1].mLocation = 1;
     vertexLayout.mAttribs[1].mOffset = 3 * sizeof(float);
     vertexLayout.mAttribs[1].mRate = VERTEX_ATTRIB_RATE_VERTEX;
 #endif
@@ -475,8 +478,11 @@ void LightSourcePipeline::Unload()
     removePipeline(pRenderer, pPipeline);
 }
 
-void LightSourcePipeline::UpdateUb(const mat4 &projViewMat, int frameIndex)
+void LightSourcePipeline::UpdateUb(int frameIndex, const mat4 &projViewMat, const eastl::vector<vec3> &lightPositions,
+                                   const eastl::vector<vec3> &lightColors)
 {
+    ASSERT(lightPositions.size() <= MAX_LIGHTS_COUNT && lightPositions.size() == lightColors.size());
+
     BufferUpdateDesc viewUbUpdate = {};
     viewUbUpdate.pBuffer = pViewUb[frameIndex];
     beginUpdateResource(&viewUbUpdate);
@@ -489,10 +495,15 @@ void LightSourcePipeline::UpdateUb(const mat4 &projViewMat, int frameIndex)
     instanceUbUpdate.pBuffer = pInstanceUb[frameIndex];
     beginUpdateResource(&instanceUbUpdate);
     InstanceUniformData instanceUniformData = {};
-    instanceUniformData.mModelMat = mat4::identity();
-    instanceUniformData.mColor = {0.5f, 0, 0.5f};
+    for (eastl_size_t i = 0; i < lightPositions.size(); i++)
+    {
+        instanceUniformData.mModelMat[i] = mat4::translation(lightPositions[i]);
+        instanceUniformData.mColor[i] = lightColors[i];
+    }
     memcpy(instanceUbUpdate.pMappedData, &instanceUniformData, sizeof(InstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
+
+    mInstancesCount = (uint32_t)lightPositions.size();
 }
 
 void LightSourcePipeline::BuildCmd(Cmd *pCmd)
@@ -503,5 +514,6 @@ void LightSourcePipeline::BuildCmd(Cmd *pCmd)
     cmdBindVertexBuffer(pCmd, 1, &pLightSourceVb, &stride, &offset);
     cmdBindDescriptorSet(pCmd, 0, pDescriptorSetView);
     cmdBindDescriptorSet(pCmd, 1, pDescriptorSetInstance);
-    cmdDraw(pCmd, mLightSourceVerticesCount, 0);
+    // cmdDraw(pCmd, mLightSourceVerticesCount, 0);
+    cmdDrawInstanced(pCmd, mLightSourceVerticesCount, 0, mInstancesCount, 0);
 }

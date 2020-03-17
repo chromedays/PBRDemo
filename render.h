@@ -28,6 +28,8 @@ struct MainViewUniformData
     mat4 mProjMat;
 };
 
+#define MAX_LIGHTS_COUNT 20
+
 struct LightSourcePipeline
 {
     struct ViewUniformData
@@ -37,8 +39,8 @@ struct LightSourcePipeline
 
     struct InstanceUniformData
     {
-        mat4 mModelMat;
-        vec3 mColor;
+        mat4 mModelMat[MAX_LIGHTS_COUNT];
+        vec3 mColor[MAX_LIGHTS_COUNT];
     };
 
     Renderer *pRenderer;
@@ -54,12 +56,15 @@ struct LightSourcePipeline
 
     Pipeline *pPipeline;
 
+    uint32_t mInstancesCount;
+
     void Init(Renderer *pRenderer);
     void Exit();
     void Load(SwapChain *pSwapChain, RenderTarget *pDepthBuffer);
     void Unload();
 
-    void UpdateUb(const mat4 &projViewMat, int frameIndex);
+    void UpdateUb(int frameIndex, const mat4 &projViewMat, const eastl::vector<vec3> &lightPositions,
+                  const eastl::vector<vec3> &lightColors);
     void BuildCmd(Cmd *pCmd);
 };
 
@@ -96,15 +101,11 @@ struct Render
 
     uint32_t mFrameIndex;
 
-    explicit Render(IApp *pApp) : pApp(pApp)
-    {
-    }
-
-    void Init();
+    void Init(IApp *pApp);
     void Exit();
     void Load();
     void Unload();
-    void Draw(const mat4 &viewMat);
+    void Draw(const mat4 &viewMat, const eastl::vector<vec3> &lightPositions, const eastl::vector<vec3> &lightColors);
 
   private:
     void AddPipeline();

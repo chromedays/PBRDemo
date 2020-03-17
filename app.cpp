@@ -12,16 +12,18 @@ class App : public IApp
 
     ICameraController *pCamera;
 
-    App() : mRender(this)
-    {
-    }
+    eastl::vector<vec3> mLightPositions;
+    eastl::vector<vec3> mLightColors;
 
     bool Init() override
     {
-        mRender.Init();
+        mLightPositions = {{-1, -1, -1}};
+        mLightColors = {{0.5f, 0.5f, 1.f}};
+
+        mRender.Init(this);
 
         pCamera = createFpsCameraController({0, 0, 0}, {0, 0, 1});
-        pCamera->setMotionParameters({10.0f, 60.0f, 20.0f});
+        pCamera->setMotionParameters({30.0f, 60.0f, 20.0f});
 
         initInputSystem(pWindow);
         InputActionDesc inputAction = {};
@@ -56,11 +58,21 @@ class App : public IApp
         };
         addInputAction(&inputAction);
 
+        mLightPositions = {
+            {-8, -8, -8}, {-8, -8, 8}, {8, -8, -8}, {8, -8, 8}, {-8, 8, -8}, {-8, 8, 8}, {8, 8, -8}, {8, 8, 8},
+        };
+
+        mLightColors = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
+                        {1, 0, 1}, {0, 1, 1}, {1, 1, 1}, {0.5f, 0.5f, 0.5f}};
+
         return true;
     }
 
     void Exit() override
     {
+        mLightColors.set_capacity(0);
+        mLightPositions.set_capacity(0);
+
         exitInputSystem();
 
         destroyCameraController(pCamera);
@@ -88,7 +100,7 @@ class App : public IApp
 
     void Draw() override
     {
-        mRender.Draw(pCamera->getViewMatrix());
+        mRender.Draw(pCamera->getViewMatrix(), mLightPositions, mLightColors);
     }
 
     const char *GetName() override

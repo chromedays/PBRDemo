@@ -26,5 +26,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="render.h" />
+    <ClInclude Include="game.h" />
   </ItemGroup>
 </Project>
