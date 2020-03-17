@@ -58,7 +58,7 @@ void Render::Init()
     BufferLoadDesc viewUbLoad = {};
     viewUbLoad.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
     viewUbLoad.mDesc.mDescriptors = DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    viewUbLoad.mDesc.mSize = sizeof(ViewUniformData);
+    viewUbLoad.mDesc.mSize = sizeof(MainViewUniformData);
     for (uint32_t i = 0; i < std::size(pViewUb); i++)
     {
         viewUbLoad.ppBuffer = &pViewUb[i];
@@ -68,7 +68,7 @@ void Render::Init()
     BufferLoadDesc instanceUbLoad = {};
     instanceUbLoad.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
     instanceUbLoad.mDesc.mDescriptors = DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    instanceUbLoad.mDesc.mSize = sizeof(InstanceUniformData);
+    instanceUbLoad.mDesc.mSize = sizeof(MainInstanceUniformData);
     for (size_t i = 0; i < std::size(pInstanceUb); i++)
     {
         instanceUbLoad.ppBuffer = &pInstanceUb[i];
@@ -209,20 +209,20 @@ void Render::Draw(const mat4 &viewMat)
 
     BufferUpdateDesc viewUbUpdate = {};
     viewUbUpdate.pBuffer = pViewUb[mFrameIndex];
-    ViewUniformData tempViewUniformData = {};
+    MainViewUniformData tempViewUniformData = {};
     tempViewUniformData.mViewMat = viewMat;
     tempViewUniformData.mProjMat = projMat;
 
     beginUpdateResource(&viewUbUpdate);
-    memcpy(viewUbUpdate.pMappedData, &tempViewUniformData, sizeof(ViewUniformData));
+    memcpy(viewUbUpdate.pMappedData, &tempViewUniformData, sizeof(MainViewUniformData));
     endUpdateResource(&viewUbUpdate, NULL);
 
     BufferUpdateDesc instanceUbUpdate = {};
     instanceUbUpdate.pBuffer = pInstanceUb[mFrameIndex];
-    InstanceUniformData tempInstanceUniformData = {};
+    MainInstanceUniformData tempInstanceUniformData = {};
     tempInstanceUniformData.mModelMat = mat4::translation({2, 2, 5});
     beginUpdateResource(&instanceUbUpdate);
-    memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(InstanceUniformData));
+    memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(MainInstanceUniformData));
     endUpdateResource(&instanceUbUpdate, NULL);
 
     mLightSourcePipeline.UpdateUb(projMat * viewMat, mFrameIndex);

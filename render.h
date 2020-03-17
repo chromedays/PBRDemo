@@ -13,7 +13,7 @@ struct Vertex
     float mNormal[3];
 };
 
-struct InstanceUniformData
+struct MainInstanceUniformData
 {
     mat4 mModelMat;
     float mAlbedo;
@@ -22,7 +22,7 @@ struct InstanceUniformData
     float mAO;
 };
 
-struct ViewUniformData
+struct MainViewUniformData
 {
     mat4 mViewMat;
     mat4 mProjMat;
@@ -55,7 +55,6 @@ struct LightSourcePipeline
     Pipeline *pPipeline;
 
     void Init(Renderer *pRenderer);
-
     void Exit();
     void Load(SwapChain *pSwapChain, RenderTarget *pDepthBuffer);
     void Unload();
@@ -102,13 +101,9 @@ struct Render
     }
 
     void Init();
-
     void Exit();
-
     void Load();
-
     void Unload();
-
     void Draw(const mat4 &viewMat);
 
   private:
