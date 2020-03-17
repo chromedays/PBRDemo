@@ -22,7 +22,7 @@ class App : public IApp
 
         mRender.Init(this);
 
-        pCamera = createFpsCameraController({0, 0, 0}, {0, 0, 1});
+        pCamera = createFpsCameraController({25, 25, -25}, {0, 0, 0});
         pCamera->setMotionParameters({30.0f, 60.0f, 20.0f});
 
         initInputSystem(pWindow);
