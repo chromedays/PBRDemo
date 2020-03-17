@@ -24,7 +24,8 @@ struct InstanceUniformData
 
 struct ViewUniformData
 {
-    mat4 mProjectViewMat;
+    mat4 mViewMat;
+    mat4 mProjMat;
 };
 
 struct Render
@@ -69,6 +70,9 @@ struct Render
 
     void Unload();
 
+    void Draw();
+
+  private:
     void AddPipeline();
 };
 

@@ -50,6 +50,7 @@ class Game : public IApp
 
     void Draw() override
     {
+        mRender.Draw();
     }
 
     const char *GetName() override

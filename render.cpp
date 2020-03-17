@@ -110,6 +110,7 @@ void Render::Init()
 
 void Render::Exit()
 {
+    waitQueueIdle(pGraphicsQueue);
     removeDescriptorSet(pRenderer, pDescriptorSet);
     removeRootSignature(pRenderer, pRootSignature);
     for (size_t i = 0; i < std::size(pInstanceUb); i++)
@@ -165,12 +166,93 @@ void Render::Load()
 
 void Render::Unload()
 {
+    waitQueueIdle(pGraphicsQueue);
     removePipeline(pRenderer, pPipeline);
     pPipeline = NULL;
     removeRenderTarget(pRenderer, pDepthBuffer);
     pDepthBuffer = NULL;
     removeSwapChain(pRenderer, pSwapChain);
     pSwapChain = NULL;
+}
+
+void Render::Draw()
+{
+    acquireNextImage(pRenderer, pSwapChain, pImageAcquiredSemaphore, NULL, &mFrameIndex);
+
+    RenderTarget *pRenderTarget = pSwapChain->ppRenderTargets[mFrameIndex];
+    Semaphore *pRenderCompleteSemaphore = pRenderCompleteSemaphores[mFrameIndex];
+    Fence *pRenderCompleteFence = pRenderCompleteFences[mFrameIndex];
+
+    FenceStatus fenceStatus;
+    getFenceStatus(pRenderer, pRenderCompleteFence, &fenceStatus);
+    if (fenceStatus == FENCE_STATUS_INCOMPLETE)
+        waitForFences(pRenderer, 1, &pRenderCompleteFence);
+
+    BufferUpdateDesc viewUbUpdate = {};
+    viewUbUpdate.pBuffer = pViewUb[mFrameIndex];
+    ViewUniformData tempViewUniformData = {};
+    tempViewUniformData.mViewMat = mat4::identity();
+    tempViewUniformData.mProjMat =
+        mat4::perspective(degToRad(60), (float)pApp->mSettings.mHeight / (float)pApp->mSettings.mWidth, 0.1f, 100);
+    beginUpdateResource(&viewUbUpdate);
+    memcpy(viewUbUpdate.pMappedData, &tempViewUniformData, sizeof(ViewUniformData));
+    endUpdateResource(&viewUbUpdate, NULL);
+
+    BufferUpdateDesc instanceUbUpdate = {};
+    instanceUbUpdate.pBuffer = pInstanceUb[mFrameIndex];
+    InstanceUniformData tempInstanceUniformData = {};
+    tempInstanceUniformData.mModelMat = mat4::translation({0, 0, -3});
+    beginUpdateResource(&instanceUbUpdate);
+    memcpy(instanceUbUpdate.pMappedData, &tempInstanceUniformData, sizeof(InstanceUniformData));
+    endUpdateResource(&instanceUbUpdate, NULL);
+
+    Cmd *cmd = ppCmds[mFrameIndex];
+    beginCmd(cmd);
+
+    RenderTargetBarrier barriers[2] = {};
+    barriers[0].pRenderTarget = pRenderTarget;
+    barriers[0].mNewState = RESOURCE_STATE_RENDER_TARGET;
+    barriers[1].pRenderTarget = pDepthBuffer;
+    barriers[1].mNewState = RESOURCE_STATE_DEPTH_WRITE;
+    cmdResourceBarrier(cmd, 0, NULL, 0, NULL, 2, barriers);
+
+    LoadActionsDesc loadActions = {};
+    loadActions.mLoadActionsColor[0] = LOAD_ACTION_CLEAR;
+    loadActions.mClearColorValues[0].r = 1.0f;
+    loadActions.mClearColorValues[0].g = 1.0f;
+    loadActions.mClearColorValues[0].b = 0.0f;
+    loadActions.mClearColorValues[0].a = 0.0f;
+    loadActions.mLoadActionDepth = LOAD_ACTION_CLEAR;
+    loadActions.mClearDepth.depth = 0.0f;
+    loadActions.mClearDepth.stencil = 0;
+    cmdBindRenderTargets(cmd, 1, &pRenderTarget, pDepthBuffer, &loadActions, NULL, NULL, (uint32_t)(-1),
+                         (uint32_t)(-1));
+    cmdSetViewport(cmd, 0, 0, (float)pRenderTarget->mWidth, (float)pRenderTarget->mHeight, 0, 1);
+    cmdSetScissor(cmd, 0, 0, pRenderTarget->mWidth, pRenderTarget->mHeight);
+
+    cmdBindRenderTargets(cmd, 0, NULL, NULL, NULL, NULL, NULL, (uint32_t)(-1), (uint32_t)(-1));
+    barriers[0].pRenderTarget = pRenderTarget;
+    barriers[0].mNewState = RESOURCE_STATE_PRESENT;
+    cmdResourceBarrier(cmd, 0, NULL, 0, NULL, 1, barriers);
+
+    endCmd(cmd);
+
+    QueueSubmitDesc submitDesc = {};
+    submitDesc.mCmdCount = 1;
+    submitDesc.ppCmds = &cmd;
+    submitDesc.pSignalFence = pRenderCompleteFence;
+    submitDesc.mWaitSemaphoreCount = 1;
+    submitDesc.ppWaitSemaphores = &pImageAcquiredSemaphore;
+    submitDesc.mSignalSemaphoreCount = 1;
+    submitDesc.ppSignalSemaphores = &pRenderCompleteSemaphore;
+    queueSubmit(pGraphicsQueue, &submitDesc);
+    QueuePresentDesc presentDesc = {};
+    presentDesc.pSwapChain = pSwapChain;
+    presentDesc.mWaitSemaphoreCount = 1;
+    presentDesc.ppWaitSemaphores = &pRenderCompleteSemaphore;
+    presentDesc.mIndex = mFrameIndex;
+    presentDesc.mSubmitDone = true;
+    queuePresent(pGraphicsQueue, &presentDesc);
 }
 
 void Render::AddPipeline()
