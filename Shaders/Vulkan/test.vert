@@ -6,11 +6,11 @@ layout (location = 1) in vec3 inNormal;
 #define MAX_LIGHTS_COUNT 20
 
 layout (binding = 0, std140, UPDATE_FREQ_PER_FRAME) uniform ViewUbo {
-	mat4 mViewMat;
+    mat4 mViewMat;
     mat4 mProjMat;
-	vec3 mCamPos;
-	vec3 mLightPositions[MAX_LIGHTS_COUNT];
-	vec3 mLightColors[MAX_LIGHTS_COUNT];
+    vec3 mCamPos;
+    vec3 mLightPositions[MAX_LIGHTS_COUNT];
+    vec3 mLightColors[MAX_LIGHTS_COUNT];
 } view;
 
 layout (binding = 1, std140, UPDATE_FREQ_PER_DRAW) uniform InstanceUBO {
@@ -30,10 +30,10 @@ out gl_PerVertex {
 
 void main()
 {
-	mat4 viewModelMat = view.mViewMat * instance.mModelMat;
+    mat4 viewModelMat = view.mViewMat * instance.mModelMat;
     mat3 normalMat = mat3(transpose(inverse(instance.mModelMat)));
     outWorldPos = (instance.mModelMat * vec4(inPos.xyz, 1)).xyz;
     outNormal = normalMat * inNormal;
     //outColor = ((inNormal) + vec3(1)) * 0.5;
-	gl_Position = view.mProjMat * viewModelMat * vec4(inPos.xyz, 1);
+    gl_Position = view.mProjMat * viewModelMat * vec4(inPos.xyz, 1);
 }
